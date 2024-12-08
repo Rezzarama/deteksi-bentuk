@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deteksi Bentuk Tanpa OpenCV</title>
+    <style>
+      #canvas {
+        border: 1px solid black;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Deteksi Bentuk Menggunakan Canvas</h1>
+    <input type="file" id="imageInput" />
+    <br /><br />
+    <canvas id="canvas"></canvas>
+
+    <script>
+      // Fungsi untuk mendeteksi bentuk berdasarkan jumlah sisi objek
+      function detectShape(points) {
+        if (points.length === 3) {
+          return "Segitiga";
+        } else if (points.length === 4) {
+          return "Persegi/Panjang";
+        } else if (points.length > 4) {
+          // Cek apakah itu lingkaran dengan rasio bentuk
+          return isCircle(points) ? "Lingkaran" : "Bentuk Lain";
+        }
+        return "Bentuk Tidak Dikenali";
+      }
+
+      // Fungsi untuk memeriksa apakah objek berbentuk lingkaran berdasarkan rasio aspek
+      function isCircle(points) {
+        const n = points.length;
+        let perimeter = 0;
+        let area = 0;
+
+        for (let i = 0; i < n; i++) {
+          const p1 = points[i];
+          const p2 = points[(i + 1) % n];
+          perimeter += Math.sqrt(
+            Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
+          ); // Hitung panjang keliling
+        }
+
+        // Tentukan area yang mendekati lingkaran
+        const xMin = Math.min(...points.map((p) => p.x));
+        const xMax = Math.max(...points.map((p) => p.x));
+        const yMin = Math.min(...points.map((p) => p.y));
+        const yMax = Math.max(...points.map((p) => p.y));
+        const width = xMax - xMin;
+        const height = yMax - yMin;
+        const aspectRatio = width / height;
+
+        // Periksa rasio keliling dan area untuk mengidentifikasi lingkaran
+        const expectedPerimeter =
+          Math.PI * Math.sqrt(2 * (width * width + height * height)); // Estimasi keliling lingkaran
+        if (
+          Math.abs(perimeter - expectedPerimeter) < 10 &&
+          Math.abs(aspectRatio - 1) < 0.1
+        ) {
+          return true;
+        }
+        return false;
+      }
+
+      // Fungsi untuk mendeteksi tepi objek dalam gambar
+      function findContour(imageData) {
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+        let points = [];
+
+        // Analisis piksel untuk mendeteksi tepi objek
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const idx = (y * width + x) * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            const alpha = data[idx + 3];
+
+            if (alpha > 0) {
+              // Menandai piksel yang membentuk objek
+              if (r < 150 && g < 150 && b < 150) {
+                // Deteksi piksel bukan latar belakang (misalnya, warna gelap)
+                points.push({ x, y });
+              }
+            }
+          }
+        }
+        return points;
+      }
+
+      // Fungsi untuk memuat gambar dan memulai pemrosesan
+      function processImage() {
+        const fileInput = document.getElementById("imageInput");
+        const file = fileInput.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            const img = new Image();
+            img.onload = function () {
+              const canvas = document.getElementById("canvas");
+              const ctx = canvas.getContext("2d");
+              canvas.width = img.width;
+              canvas.height = img.height;
+              ctx.drawImage(img, 0, 0);
+
+              // Ambil data gambar dari canvas
+              const imageData = ctx.getImageData(
+                0,
+                0,
+                canvas.width,
+                canvas.height
+              );
+
+              // Temukan kontur berdasarkan piksel
+              const points = findContour(imageData);
+
+              // Menampilkan hasil deteksi bentuk
+              const shape = detectShape(points);
+              alert("Bentuk yang terdeteksi: " + shape);
+            };
+            img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+
+      // Menambahkan event listener untuk input gambar
+      document
+        .getElementById("imageInput")
+        .addEventListener("change", processImage);
+    </script>
+  </body>
+</html>
